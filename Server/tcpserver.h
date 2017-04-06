@@ -41,12 +41,13 @@ struct requests_receiver_arg{
 };
 static void * requests_receiver(void *vp_arg){
     struct requests_receiver_arg *arg = (struct requests_receiver_arg*) vp_arg;
-    struct mq_request_node input_request;
     int tmp_socket = arg->listen_socket_fd;
+    struct mq_request_node input_request;
     while (!*(arg->thread.end)){
+        bzero(input_request.msg, BUFFER_SIZE);
         input_request.socket = accept(tmp_socket, NULL, NULL);
         if (input_request.socket == -1) handle_error("accept");
-        if (read(input_request.socket, input_request.msg, BUFFER_SIZE + 1) == -1)
+        if (read(input_request.socket, input_request.msg, BUFFER_SIZE) == -1)
             handle_error("client read");
         if (mq_send(*(arg->mq_recv), (const char*) &input_request, sizeof(struct mq_request_node), NULL))
             handle_error("mq_send recv");
@@ -66,12 +67,15 @@ static void * requests_handler(void *vp_arg){
     while (!*(arg->thread.end)){
         if (mq_receive(*(arg->mq_recv), (char*) &moved_request, sizeof(struct mq_request_node), NULL) == -1)
             handle_error("mq_receive recv");
-        sprintf(tmp_msg, moved_request.msg);
+
+        bzero(tmp_msg, BUFFER_SIZE);
+        sprintf(tmp_msg, "%s", moved_request.msg);
+
+        bzero(moved_request.msg, BUFFER_SIZE);
         sprintf(moved_request.msg, "you say: %s", tmp_msg);
         if (mq_send(*(arg->mq_send), (const char*) &moved_request, sizeof(struct mq_request_node), 0))
             handle_error("mq_send send");
-        memset(moved_request.msg, 0, strlen(moved_request.msg));
-        memset(tmp_msg, 0, strlen(tmp_msg));
+        bzero(moved_request.msg, BUFFER_SIZE);
     }
     pthread_exit((void*) &arg->thread.id);
 }
@@ -86,7 +90,7 @@ static void * requests_sender(void *vp_arg){
     while (!*(arg->thread.end)){
         if (mq_receive(*(arg->mq_send), (char*) &output_request, sizeof(struct mq_request_node), NULL) == -1)
             handle_error("mq_receive send");
-        if (send(output_request.socket, (void*) output_request.msg, BUFFER_SIZE + 1, MSG_CONFIRM) == -1)
+        if (send(output_request.socket, (void*) output_request.msg, BUFFER_SIZE, MSG_CONFIRM) == -1)
             handle_error("send");
         if(close(output_request.socket)) handle_error("close client socket");
     }
