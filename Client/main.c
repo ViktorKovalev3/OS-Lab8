@@ -22,31 +22,35 @@ static void * simple_tcp_client(void *vp_arg){
     struct simple_tcp_client_arg *arg = (struct requests_sender_arg *) vp_arg;
 
     //Connection section
-    const int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
     struct sockaddr_in address;
     inet_aton("127.0.0.1", &address);
     address.sin_port   = htons(48655);
     address.sin_family = AF_INET;
 
-    if (connect(sockfd, (struct sockaddr*) &address, sizeof(address)))
-        handle_error("connect");
-
     //Working section
     srand(time(NULL));
     char out_msg[BUFFER_SIZE];
     char in_msg [BUFFER_SIZE];
+    int sockfd;
     while (!*(arg->finish_work)){
+        sockfd = 0;
+        sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        if (connect(sockfd, (struct sockaddr*) &address, sizeof(address)))
+            handle_error("connect");
         //send
+        bzero(out_msg, BUFFER_SIZE);
         sprintf(out_msg, "%d", rand());
-        printf("Num is %s\n", out_msg);
-        if(send(sockfd, (void*) &out_msg, BUFFER_SIZE + 1, MSG_CONFIRM) == -1)
+        printf("You:\n\"%s\"\n", out_msg);
+        if(send(sockfd, (void*) &out_msg, BUFFER_SIZE, MSG_CONFIRM) == -1)
             handle_error("send");
         //recv
-        if(recv(sockfd, (void*) &in_msg, BUFFER_SIZE + 1, MSG_WAITALL) == -1)
+        bzero(in_msg, BUFFER_SIZE);
+        if(recv(sockfd, (void*) &in_msg, BUFFER_SIZE, 0) == -1)
             handle_error("recv");
-        printf("%s\n", in_msg);
+        printf("Server msg:\n\"%s\"\n\n\n", in_msg);
         fflush(stdout);
+        if (close(sockfd) == -1)
+            handle_error("socket close");
         sleep(1);
     }
     pthread_exit((void*) "Client thread ended");
